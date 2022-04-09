@@ -1,1 +1,3 @@
 node_modules
+proto/**/*.ts
+proto/**/*.js
