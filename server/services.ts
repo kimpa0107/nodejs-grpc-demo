@@ -1,67 +1,50 @@
 import {
   sendUnaryData,
   ServerUnaryCall,
-  ServiceError,
-  ServerWritableStream,
-  ServerReadableStream,
   UntypedHandleCall,
-  Metadata,
-  status,
 } from '@grpc/grpc-js';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 
-import { IUsersServer } from '../proto/users_grpc_pb';
-import { User, UserRequest } from '../proto/users_pb';
-import { users } from './db';
+import { IBlogServiceServer } from '../proto/blog/gen/blog_grpc_pb';
+import {
+  Article,
+  Category,
+  Extra,
+  GetArticlesRequest,
+  GetArticlesResponse,
+} from '../proto/blog/gen/blog_pb';
 
-export class UsersServer implements IUsersServer {
+export class BlogServer implements IBlogServiceServer {
   [name: string]: UntypedHandleCall;
 
-  getUser(
-    call: ServerUnaryCall<UserRequest, User>,
-    callback: sendUnaryData<User>
+  getArticles(
+    call: ServerUnaryCall<GetArticlesRequest, GetArticlesResponse>,
+    callback: sendUnaryData<GetArticlesResponse>
   ): void {
-    const userId = call.request.getId();
-    const user = users.find(u => u.getId() === userId);
+    const resp = new GetArticlesResponse();
+    resp.addItem(mockArticle(1));
+    resp.addItem(mockArticle(2));
 
-    if (!user) {
-      const error: ServiceError = {
-        name: 'User Missing',
-        message: `User with ID ${userId} does not exist.`,
-        code: status.NOT_FOUND,
-        details: 'User not found.',
-        metadata: new Metadata(),
-      };
-      callback(error, null);
-      return;
-    }
+    const extra = new Extra();
+    extra.setPage(call.request.getPage());
+    extra.setSize(call.request.getSize());
+    extra.setTotal(100);
+    resp.setExtra(extra);
 
-    console.log(`getUser: returning ${user.getName()} (id: ${user.getId()}).`);
-    callback(null, user);
+    callback(null, resp);
   }
+}
 
-  getUsers(call: ServerWritableStream<Empty, User>): void {
-    console.log(`getUsers: streaming all users.`);
-    for (const user of users) call.write(user);
-    call.end();
-  }
+function mockArticle(num: number): Article {
+  const article = new Article();
+  article.setId(`article-${num}`);
+  article.setTitle(`Article title - ${num}`);
+  article.setCoverImage('');
+  article.setTagsList(['tag1', 'tag2']);
 
-  createUser(
-    call: ServerReadableStream<User, Empty>,
-    callback: sendUnaryData<Empty>
-  ): void {
-    console.log(`createUsers: creating new users from stream.`);
+  const category = new Category();
+  category.setId(1);
+  category.setName('Go');
+  article.setCategory(category);
 
-    let userCount = 0;
-
-    call.on('data', u => {
-      userCount++;
-      users.push(u);
-    });
-
-    call.on('end', () => {
-      console.log(`Created ${userCount} new user(s).`);
-      callback(null, new Empty());
-    });
-  }
+  return article;
 }
